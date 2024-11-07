@@ -85,6 +85,80 @@ extern "C" {
 #define SPI_CTRLR0_TRANS_TYPE_TT2		2UL
 #define SPI_CTRLR0_TRANS_TYPE_TT3		3UL
 
+/* Register access helpers. */
+#define USES_AUX_REG(inst) + DT_INST_PROP(inst, aux_reg)
+#define AUX_REG_INSTANCES (0 DT_INST_FOREACH_STATUS_OKAY(USES_AUX_REG))
+#define BASE_ADDR(dev) (mm_reg_t)DEVICE_MMIO_GET(dev)
+
+#if AUX_REG_INSTANCES != 0
+static uint32_t aux_reg_read(const struct device *dev, uint32_t off)
+{
+	return sys_in32(BASE_ADDR(dev) + off/4);
+}
+static void aux_reg_write(uint32_t data, const struct device *dev, uint32_t off)
+{
+	sys_out32(data, BASE_ADDR(dev) + off/4);
+}
+#endif
+
+#if AUX_REG_INSTANCES != DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT)
+static uint32_t reg_read(const struct device *dev, uint32_t off)
+{
+	return sys_read32(BASE_ADDR(dev) + off);
+}
+static void reg_write(uint32_t data, const struct device *dev, uint32_t off)
+{
+	sys_write32(data, BASE_ADDR(dev) + off);
+}
+#endif
+
+#if AUX_REG_INSTANCES == 0
+/* If no instance uses aux-reg access. */
+#define DECLARE_REG_ACCESS()
+#define DEFINE_REG_ACCESS(inst)
+#define DEFINE_MM_REG_RD(reg, off) \
+	static inline uint32_t read_##reg(const struct device *dev) \
+	{ return reg_read(dev, off); }
+#define DEFINE_MM_REG_WR(reg, off) \
+	static inline void write_##reg(const struct device *dev, uint32_t data) \
+	{ reg_write(data, dev, off); }
+
+#elif AUX_REG_INSTANCES == DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT)
+/* If all instances use aux-reg access. */
+#define DECLARE_REG_ACCESS()
+#define DEFINE_REG_ACCESS(inst)
+#define DEFINE_MM_REG_RD(reg, off) \
+	static inline uint32_t read_##reg(const struct device *dev) \
+	{ return aux_reg_read(dev, off); }
+#define DEFINE_MM_REG_WR(reg, off) \
+	static inline void write_##reg(const struct device *dev, uint32_t data) \
+	{ aux_reg_write(data, dev, off); }
+
+#else
+/* If register access varies by instance. */
+#define DECLARE_REG_ACCESS() \
+	uint32_t (*read)(const struct device *dev, uint32_t off); \
+	void (*write)(uint32_t data, const struct device *dev, uint32_t off)
+#define DEFINE_REG_ACCESS(inst) \
+	COND_CODE_1(DT_INST_PROP(inst, aux_reg), \
+		(.read = aux_reg_read, \
+		.write = aux_reg_write,), \
+		(.read = reg_read, \
+		.write = reg_write,))
+#define DEFINE_MM_REG_RD(reg, off) \
+	static inline uint32_t read_##reg(const struct device *dev) \
+	{ \
+		const struct mspi_dw_config *dev_config = dev->config; \
+		return dev_config->read(dev, off); \
+	}
+#define DEFINE_MM_REG_WR(reg, off) \
+	static inline void write_##reg(const struct device *dev, uint32_t data) \
+	{ \
+		const struct mspi_dw_config *dev_config = dev->config; \
+		dev_config->write(data, dev, off); \
+	}
+#endif
+
 #ifdef __cplusplus
 }
 #endif

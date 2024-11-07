@@ -49,24 +49,10 @@ struct mspi_dw_config {
 	uint8_t rx_fifo_depth;
 	uint8_t tx_fifo_threshold;
 	uint8_t rx_fifo_threshold;
-
-	uint32_t (*read)(mm_reg_t addr, uint32_t off);
-	void (*write)(uint32_t data, mm_reg_t addr, uint32_t off);
+	DECLARE_REG_ACCESS();
 };
 
 /* Register access helpers. */
-#define DEFINE_MM_REG_RD(reg, off) \
-	static inline uint32_t read_##reg(const struct device *dev) \
-	{ \
-		const struct mspi_dw_config *dev_config = dev->config; \
-		return dev_config->read((mm_reg_t)DEVICE_MMIO_GET(dev), off); \
-	}
-#define DEFINE_MM_REG_WR(reg, off) \
-	static inline void write_##reg(const struct device *dev, uint32_t data) \
-	{ \
-		const struct mspi_dw_config *dev_config = dev->config; \
-		dev_config->write(data, (mm_reg_t)DEVICE_MMIO_GET(dev),  off); \
-	}
 #define DEFINE_MM_REG_RD_WR(reg, off) \
 	DEFINE_MM_REG_RD(reg, off) \
 	DEFINE_MM_REG_WR(reg, off)
@@ -708,31 +694,6 @@ static const struct mspi_driver_api drv_api = {
 	.transceive         = api_transceive,
 };
 
-#define USES_AUX_REG(inst) + DT_INST_PROP(inst, aux_reg)
-#define AUX_REG_INSTANCES (0 DT_INST_FOREACH_STATUS_OKAY(USES_AUX_REG))
-
-#if AUX_REG_INSTANCES != 0
-static uint32_t aux_reg_read(mm_reg_t addr, uint32_t off)
-{
-	return sys_in32(addr + off/4);
-}
-static void aux_reg_write(uint32_t data, mm_reg_t addr, uint32_t off)
-{
-	sys_out32(data, addr + off/4);
-}
-#endif
-
-#if AUX_REG_INSTANCES != DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT)
-static uint32_t reg_read(mm_reg_t addr, uint32_t off)
-{
-	return sys_read32(addr + off);
-}
-static void reg_write(uint32_t data, mm_reg_t addr, uint32_t off)
-{
-	sys_write32(data, addr + off);
-}
-#endif
-
 #define MSPI_DW_INST_IRQ(idx, inst)					\
 	IRQ_CONNECT(DT_INST_IRQ_BY_IDX(inst, idx, irq),			\
 		    DT_INST_IRQ_BY_IDX(inst, idx, priority),		\
@@ -792,11 +753,7 @@ static void reg_write(uint32_t data, mm_reg_t addr, uint32_t off)
 	IF_ENABLED(DT_INST_NODE_HAS_PROP(inst, ce_gpios),		\
 		(MSPI_DW_CE_GPIOS(inst),))				\
 		MSPI_DW_FIFO_PROPS(inst),				\
-	COND_CODE_1(DT_INST_PROP(inst, aux_reg),			\
-		(.read = aux_reg_read,					\
-		.write = aux_reg_write,),				\
-		(.read = reg_read,					\
-		.write = reg_write,))					\
+		DEFINE_REG_ACCESS(inst)					\
 	};								\
 	DEVICE_DT_INST_DEFINE(inst,					\
 		dev_init, PM_DEVICE_DT_INST_GET(inst),			\
