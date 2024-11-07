@@ -1,0 +1,8 @@
+# Copyright (c) 2024 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+description: MSPI display
+
+compatible: "mspi-display"
+
+include: [mspi-device.yaml]

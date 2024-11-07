@@ -1,0 +1,20 @@
+/delete-node/ &mx25uw63;
+
+&exmif {
+	// tx-fifo-threshold = <30>;
+	// rx-fifo-threshold = <1>;
+
+	display: display@0 {
+		compatible = "mspi-display";
+		status = "okay";
+		reg = <0>;
+
+		mspi-max-frequency = <DT_FREQ_M(50)>;
+		mspi-io-mode = "MSPI_IO_MODE_QUAD_1_1_4";
+		mspi-data-rate = "MSPI_DATA_RATE_SINGLE";
+		mspi-hardware-ce-num = <1>;
+		mspi-cpp-mode = "MSPI_CPP_MODE_0";
+		mspi-endian = "MSPI_BIG_ENDIAN";
+		mspi-ce-polarity = "MSPI_CE_ACTIVE_LOW";
+	};
+};
