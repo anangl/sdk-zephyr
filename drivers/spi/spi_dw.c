@@ -45,6 +45,8 @@ LOG_MODULE_REGISTER(spi_dw);
 #include <nrfx.h>
 #endif
 
+static K_SEM_DEFINE(test_sem, 0, 1);
+
 static inline bool spi_dw_is_slave(struct spi_dw_data *spi)
 {
 	return (IS_ENABLED(CONFIG_SPI_SLAVE) &&
@@ -54,7 +56,7 @@ static inline bool spi_dw_is_slave(struct spi_dw_data *spi)
 static void completed(const struct device *dev, int error)
 {
 	struct spi_dw_data *spi = dev->data;
-	struct spi_context *ctx = &spi->ctx;
+	// struct spi_context *ctx = &spi->ctx;
 
 	if (error) {
 		goto out;
@@ -75,13 +77,16 @@ out:
 	/* Disabling the controller */
 	clear_bit_ssienr(dev);
 
-	if (!spi_dw_is_slave(spi)) {
-		if (spi_cs_is_gpio(ctx->config)) {
-			spi_context_cs_control(ctx, false);
-		} else {
-			write_ser(dev, 0);
-		}
-	}
+	k_sem_give(&test_sem);
+	k_sem_take(&test_sem, K_FOREVER);
+
+	// if (!spi_dw_is_slave(spi)) {
+	// 	if (spi_cs_is_gpio(ctx->config)) {
+	// 		spi_context_cs_control(ctx, false);
+	// 	} else {
+	// 		write_ser(dev, 0);
+	// 	}
+	// }
 
 	LOG_DBG("SPI transaction completed %s error",
 		    error ? "with" : "without");
@@ -447,6 +452,16 @@ static int transceive(const struct device *dev,
 	set_bit_ssienr(dev);
 
 	ret = spi_context_wait_for_completion(&spi->ctx);
+
+	struct spi_context *ctx = &spi->ctx;
+
+	if (!spi_dw_is_slave(spi)) {
+		if (spi_cs_is_gpio(ctx->config)) {
+			spi_context_cs_control(ctx, false);
+		} else {
+			write_ser(dev, 0);
+		}
+	}
 
 #ifdef CONFIG_SPI_SLAVE
 	if (spi_context_is_slave(&spi->ctx) && !ret) {
