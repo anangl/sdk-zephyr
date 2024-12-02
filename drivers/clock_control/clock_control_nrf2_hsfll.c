@@ -141,6 +141,11 @@ static int api_request_hsfll(const struct device *dev,
 	struct onoff_manager *mgr = hsfll_find_mgr(dev, spec);
 
 	if (mgr) {
+		struct onoff_client reset_cli;
+
+		sys_notify_init_spinwait(&reset_cli.notify);
+		onoff_reset(mgr, &reset_cli);
+
 		return onoff_request(mgr, cli);
 	}
 
