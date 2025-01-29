@@ -76,7 +76,13 @@ ZTEST(secure_storage_psa_crypto, test_its_caller_isolation)
 
 	ret = psa_get_key_attributes(ID, &retrieved_key_attributes);
 	zassert_equal(ret, PSA_SUCCESS);
-	zassert_mem_equal(&retrieved_key_attributes, &key_attributes, sizeof(key_attributes));
+
+	uint8_t size = sizeof(key_attributes);
+#if defined(CONFIG_BUILD_WITH_TFM) && !defined(MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER)
+	/* Skip checking of private_reserved field */
+	size -= sizeof(key_attributes.private_reserved);
+#endif
+	zassert_mem_equal(&retrieved_key_attributes, &key_attributes, size);
 	ret = psa_destroy_key(ID);
 	zassert_equal(ret, PSA_SUCCESS);
 	ret = psa_get_key_attributes(ID, &retrieved_key_attributes);
