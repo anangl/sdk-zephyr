@@ -12,6 +12,7 @@
 #include <zephyr/usb/usbd.h>
 #include <zephyr/usb/class/usbd_msc.h>
 #include <zephyr/fs/fs.h>
+#include <zephyr/storage/disk_access.h>
 #include <stdio.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
@@ -31,7 +32,8 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 
 #if !defined(CONFIG_DISK_DRIVER_FLASH) && \
 	!defined(CONFIG_DISK_DRIVER_RAM) && \
-	!defined(CONFIG_DISK_DRIVER_SDMMC)
+	!defined(CONFIG_DISK_DRIVER_SDMMC) && \
+	!defined(CONFIG_DISK_DRIVER_MMC)
 #error No supported disk driver enabled
 #endif
 
@@ -52,6 +54,10 @@ USBD_DEFINE_MSC_LUN(nand, "NAND", "Zephyr", "FlashDisk", "0.00");
 
 #if CONFIG_DISK_DRIVER_SDMMC
 USBD_DEFINE_MSC_LUN(sd, "SD", "Zephyr", "SD", "0.00");
+#endif
+
+#if CONFIG_DISK_DRIVER_MMC
+USBD_DEFINE_MSC_LUN(mmc, "MMC", "Zephyr", "MMC", "0.00");
 #endif
 
 static int setup_flash(struct fs_mount_t *mnt)
@@ -122,6 +128,14 @@ static void setup_disk(void)
 		rc = setup_flash(mp);
 		if (rc < 0) {
 			LOG_ERR("Failed to setup flash area");
+			return;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_DISK_DRIVER_MMC)) {
+		rc = disk_access_init("MMC");
+		if (rc < 0) {
+			LOG_ERR("Failed to initialize MMC disk");
 			return;
 		}
 	}
